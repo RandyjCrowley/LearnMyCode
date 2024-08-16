@@ -67,10 +67,13 @@ if __name__ == "__main__":
     MODEL_NAME = "llama3.1"
     JSON_FILENAME = "output.json"
 
-    code_analyzer = CodeAnalyzer(path_to_learn=PATH_TO_LEARN, model_name=MODEL_NAME, json_filename=JSON_FILENAME)
+    if PATH_TO_LEARN:
+        code_analyzer = CodeAnalyzer(path_to_learn=PATH_TO_LEARN, model_name=MODEL_NAME, json_filename=JSON_FILENAME)
 
-    # Initialize the payload if it hasn't been done yet
-    if not os.path.exists(JSON_FILENAME):
-        code_analyzer.initialize_payload()
+        # Initialize the payload if it hasn't been done yet
+        if not os.path.exists(JSON_FILENAME):
+            code_analyzer.initialize_payload()
 
-    asyncio.run(code_analyzer.start_interaction())
+        asyncio.run(code_analyzer.start_interaction())
+
+    print("Please set your path to PATH_TO_LEARN in the .env :)")
