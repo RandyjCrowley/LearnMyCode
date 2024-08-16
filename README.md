@@ -30,7 +30,7 @@ To run this project, you'll need to install the required libraries. Run the foll
 
 ```bash
 git clone https://github.com/RandyjCrowley/LearnMyCode.git
-cd code-analyzer-with-ai-chatbot
+cd LearnMyCode
 pip install -r requirements.txt
 ```
 
