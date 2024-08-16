@@ -1,104 +1,76 @@
 import os
-import json
-import sys
-from time import sleep
 import asyncio
-from ollama import Client
+from ai_chatbot import AIChatbot
+from utils import read_file_content, read_directory
 from dotenv import load_dotenv
-import os
 
 load_dotenv()
 
+class CodeAnalyzer:
+    def __init__(self, path_to_learn: str, model_name: str, json_filename: str):
+        self.path_to_learn = path_to_learn
+        self.ai_chatbot = AIChatbot(model_name=model_name, json_filename=json_filename)
 
+    def initialize_payload(self) -> None:
+        """
+        Initializes the payload with the code base and initial instructions.
+        """
+        files = read_directory(self.path_to_learn)
+        initial_payload = [{'role': 'user', 'content': read_file_content(file)} for file in files if read_file_content(file)]
+        initial_instruction = {
+            'role': 'user',
+            'content': 'You will act as a Code Analyzer and understand that I can ask comments about my entire code base. You must respond to questions and statements related to my code and nothing else. Here is my code base:'
+        }
+        self.ai_chatbot.payload.insert(0, initial_instruction)
+        self.ai_chatbot.payload.extend(initial_payload)
+        self.ai_chatbot.save_payload_to_file()
 
+    async def start_interaction(self) -> None:
+        """
+        Main loop for interacting with the AI model.
+        """
+        print("type 'exit' or 'quit' to leave")
+        while True:
+            try:
+                user_input = input("Enter your message: ")
+                if user_input.lower() in ['exit', 'quit']:
+                    print("bye bye o/")
+                    break
 
+                # Append user input to the payload with 'user' role
+                self.ai_chatbot.add_message_to_payload(role='user', content=user_input)
 
+                # Prepare messages for the AI
+                messages = [{'role': message['role'], 'content': message['content']} for message in self.ai_chatbot.payload]
 
+                # Get AI response
+                response = await self.ai_chatbot.generate_ai_response(messages)
+                if response is None:
+                    print("Failed to generate a response. Please try again.")
+                    continue
 
-PATH_TO_LEARN = os.getenv("PATH_TO_LEARN")
-IGNORE_LIST = [".git","vendor"]
-JSON_FILENAME = "output.json"
-MODEL_NAME = "llama3.1"
+                # Append AI response to the payload with 'assistant' role
+                self.ai_chatbot.add_message_to_payload(role='assistant', content=response)
 
+                # Print a newline after the complete response is printed
+                print()
 
-def read_file(file_name):
-    try:
-        with open(file_name, "r", encoding="utf-8") as f:
-            return format_string(content=f.read(), file_name=file_name)
-    except UnicodeDecodeError:
-        print(f"Error reading {file_name}: UnicodeDecodeError")
-        return ''
-    except Exception as e:
-        print(f"Error reading {file_name}: {e}")
-        return ''
-
-
-def format_string(content, file_name):
-    return f"=========\nFileName: {file_name}\nContent:\n{content}\n========="
-
-
-def recursive_walk(path):
-    new_files = []
-    for root, _, files in os.walk(path):
-        if not any(ignored in root for ignored in IGNORE_LIST):
-            for file in files:
-                file = os.path.join(root, file)
-                new_files.append(file)
-    return new_files
-
-
-def get_initial_payload():
-    if not os.path.exists(JSON_FILENAME):
-        files = recursive_walk(PATH_TO_LEARN)
-        payload = [{'role': 'user', 'content': read_file(file)} for file in files if read_file(file)]
-        payload[:0] = [{'role': 'user', 'content': 'You will act as a Code Analyzer and understand that I can ask comments about my entire code base. You must respond to questions and statements related to my code and nothing else. Here is my code base:'}]
-        with open(JSON_FILENAME, "w") as f:
-            json.dump(payload, f)
-    else:
-        with open(JSON_FILENAME, "r") as f:
-            payload = json.load(f)
-    return payload
-
-
-def save_payload(payload):
-    with open(JSON_FILENAME, "w") as f:
-        json.dump(payload, f)
-
-
-async def initialize_ai(messages):
-    response = ""
-    Client.chat(model=MODEL_NAME, messages=messages)
-    for part in :
-        content = part['message']['content']
-        response += content
-        print(content, end='', flush=True)  # Print the content as it's received
-    return response
-
-
-async def main():
-    payload = get_initial_payload()
-    while True:
-        user_input = input("Enter your message: ")
-        if user_input.lower() in ['exit', 'quit']:
-            break
-
-        # Append user input to payload with 'user' role
-        payload.append({'role': 'user', 'content': user_input})
-
-        # Prepare messages for the AI
-        messages = [{'role': message['role'], 'content': message['content']} for message in payload]
-
-        # Get AI response
-        response = await initialize_ai(messages)
-
-        # Append AI response to payload with 'assistant' role
-        payload.append({'role': 'assistant', 'content': response})
-
-        # Save updated payload
-        save_payload(payload)
-
-        # Print a newline after the complete response is printed
-        print()
+            except KeyboardInterrupt:
+                print("\nOperation interrupted by user. Exiting...")
+                break
+            except Exception as e:
+                print(f"Unexpected error in main loop: {e}")
+                break
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    PATH_TO_LEARN = os.getenv("PATH_TO_LEARN", "")
+    MODEL_NAME = "llama3.1"
+    JSON_FILENAME = "output.json"
+
+    code_analyzer = CodeAnalyzer(path_to_learn=PATH_TO_LEARN, model_name=MODEL_NAME, json_filename=JSON_FILENAME)
+
+    # Initialize the payload if it hasn't been done yet
+    if not os.path.exists(JSON_FILENAME):
+        code_analyzer.initialize_payload()
+
+    asyncio.run(code_analyzer.start_interaction())
